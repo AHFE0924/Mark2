@@ -193,8 +193,8 @@ try:
 except ImportError:
     UMAP_AVAILABLE = False
 
-# CITATIONS & REFERENCES (ISEF REQUIREMENT)
-# All data sources and methods must be properly cited for ISEF and publication
+# CITATIONS & REFERENCES
+# All data sources and methods should be properly cited for reproducibility and publication
 CITATIONS = {
     # Machine Learning Methods
     "ESM-2": {
@@ -299,11 +299,11 @@ def format_citation(key: str) -> str:
         return f"{c['authors']} ({c['year']}). {c['title']}. {c.get('url', '')}"
 
 
-# VERSION TRACKING (ISEF Reproducibility Requirement)
+# VERSION TRACKING (Reproducibility)
 def get_version_info() -> Dict[str, str]:
     """
     Capture all software versions for reproducibility.
-    This is critical for ISEF and publication to ensure experiments can be replicated.
+    This is critical for publication to ensure experiments can be replicated.
     """
     versions = {
         "python": sys.version.split()[0],
@@ -523,7 +523,7 @@ def get_ndm_variants() -> Dict[str, str]:
     }
 
 
-# NDM-1 DATABASE (ISEF Focus: Deep Analysis of Single Enzyme)
+# NDM-1 DATABASE (Deep Analysis of Single Enzyme)
 # NDM-1: New Delhi Metallo-β-lactamase - WHO Critical Priority Pathogen
 NDM1_INFO = {
     "full_name": "New Delhi Metallo-β-lactamase-1",
@@ -612,7 +612,7 @@ EXPERIMENTAL_MIC = {
     "NDM-7": {"meropenem": 64, "imipenem": 32, "ertapenem": 128, "doripenem": 32},
 }
 
-# NDM-1 Clinical epidemiology data (for ISEF clinical relevance)
+# NDM-1 Clinical epidemiology data (for clinical relevance)
 # Sources: CDC AR Special Report 2022, WHO Priority Pathogens List 2024
 NDM1_EPIDEMIOLOGY = {
     # CDC 2022 AR Threats Report: ~13,100 CRE cases/year in hospitalized patients
@@ -2245,9 +2245,9 @@ def calculate_enrichment(agg_df: pd.DataFrame, top_k: int = 30) -> Dict:
     }
 
 
-# ISEF ENHANCEMENT: BASELINE COMPARISONS
+# BASELINE COMPARISONS
 class BaselineComparator:
-    """Compare our method against established baselines for ISEF benchmarking."""
+    """Compare our method against established baselines for benchmarking."""
 
     def __init__(self, sequence: str, active_sites: List[int]):
         self.sequence = sequence
@@ -2397,7 +2397,7 @@ class BaselineComparator:
             "Distance_to_Active": self.distance_to_active_site_baseline(),
         }
 
-        # Negative controls (ISEF requirement)
+        # Negative controls
         negative_controls = {
             "Scrambled_Sequence": self.scrambled_sequence_baseline(),
             "Shuffled_Active_Sites": self.shuffled_active_sites_baseline(),
@@ -2440,7 +2440,7 @@ class BaselineComparator:
         return results
 
 
-# ISEF ENHANCEMENT: K-FOLD CROSS-VALIDATION
+# K-FOLD CROSS-VALIDATION
 def k_fold_cross_validation(
     embeddings: np.ndarray, n_folds: int = 5, config: Optional[Config] = None
 ) -> Dict:
@@ -2496,7 +2496,7 @@ def k_fold_cross_validation(
     }
 
 
-# ISEF ENHANCEMENT: VALIDATE AGAINST KNOWN NDM-1 MUTATIONS
+# VALIDATE AGAINST KNOWN NDM-1 MUTATIONS
 def validate_known_mutations(agg_df: pd.DataFrame, enzyme: str = "NDM") -> Dict:
     """Validate predictions against literature-confirmed NDM-1 resistance mutations."""
     log("Validating against known NDM-1 resistance mutations...")
@@ -2805,7 +2805,7 @@ class Visualizer:
     def plot_baseline_comparison(
         self, our_auc: float, baseline_results: Dict, prefix: str = ""
     ):
-        """ISEF: Bar chart comparing our method vs baselines."""
+        """Bar chart comparing our method vs baselines."""
         fig, ax = plt.subplots(figsize=(10, 6))
 
         methods = ["Our Method\n(ESM-2 + Graph)"] + list(baseline_results.keys())
@@ -2841,7 +2841,7 @@ class Visualizer:
         log("Generated baseline comparison plot")
 
     def plot_cross_validation(self, cv_results: Dict, prefix: str = ""):
-        """ISEF: Cross-validation results with confidence intervals."""
+        """Cross-validation results with confidence intervals."""
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
         # Fold results
@@ -2894,7 +2894,7 @@ class Visualizer:
         log("Generated cross-validation plot")
 
     def plot_clinical_relevance(self, prefix: str = ""):
-        """ISEF: NDM-1 clinical impact visualization."""
+        """NDM-1 clinical impact visualization."""
         fig = plt.figure(figsize=(14, 10))
         gs = GridSpec(2, 2, figure=fig)
 
@@ -3003,7 +3003,7 @@ Transmission: {epi["transmission"]}
         log("Generated NDM-1 clinical impact plot")
 
     def plot_known_mutations_validation(self, mutation_results: Dict, prefix: str = ""):
-        """ISEF: Validation against literature-confirmed NDM-1 mutations."""
+        """Validation against literature-confirmed NDM-1 mutations."""
         if not mutation_results.get("validated") or not mutation_results.get(
             "mutations"
         ):
@@ -3080,7 +3080,7 @@ Transmission: {epi["transmission"]}
     def plot_bfactor_correlation(
         self, agg_df: pd.DataFrame, bfactor_results: Dict, prefix: str = ""
     ):
-        """ISEF: Plot correlation between predictions and crystallographic B-factors."""
+        """Plot correlation between predictions and crystallographic B-factors."""
         if not bfactor_results.get("available"):
             return
 
@@ -3343,7 +3343,7 @@ class NDMPredictor:
         """Run complete analysis pipeline."""
         log("NDM-1 MUTATION HOTSPOT PREDICTION PIPELINE")
 
-        # Log version info for reproducibility (ISEF requirement)
+        # Log version info for reproducibility
         version_info = log_version_info()
         self.results["version_info"] = version_info
 
@@ -3664,7 +3664,7 @@ class NDMPredictor:
         return agg_df
 
     def _validate(self, agg_df: pd.DataFrame) -> Dict:
-        """Run all validations including ISEF enhancements."""
+        """Run all validations."""
         results = {}
 
         # Core validations
@@ -3674,23 +3674,23 @@ class NDMPredictor:
         results["mic_validation"] = validate_against_mic(self.embeddings)
 
         # B-factor correlation analysis (crystallographic validation)
-        log("\n[ISEF] Running B-factor correlation analysis...")
+        log("\nRunning B-factor correlation analysis...")
         results["bfactor"] = analyze_bfactor_correlation(agg_df)
 
-        # ISEF Enhancement: Baseline comparisons
-        log("\n[ISEF] Running baseline comparisons...")
+        # Baseline comparisons
+        log("\nRunning baseline comparisons...")
         comparator = BaselineComparator(NDM1_SEQUENCE, ACTIVE_SITE_RESIDUES)
         results["baselines"] = comparator.run_all_baselines()
 
-        # ISEF Enhancement: Cross-validation
+        # Cross-validation
         if BASELINE_NAME in self.embeddings:
-            log("\n[ISEF] Running k-fold cross-validation...")
+            log("\nRunning k-fold cross-validation...")
             results["cross_validation"] = k_fold_cross_validation(
                 self.embeddings[BASELINE_NAME], n_folds=5, config=self.config
             )
 
-        # ISEF Enhancement: Known mutation validation
-        log("\n[ISEF] Validating against known resistance mutations...")
+        # Known mutation validation
+        log("\nValidating against known resistance mutations...")
         results["known_mutations"] = validate_known_mutations(agg_df, enzyme="NDM")
 
         self.results = results
@@ -3703,7 +3703,7 @@ class NDMPredictor:
         loss_data: Dict,
         attn: Optional[np.ndarray],
     ):
-        """Generate all outputs including ISEF visualizations."""
+        """Generate all outputs."""
         # Core visualizations
         if loss_data.get("train_losses"):
             self.visualizer.plot_loss_curves(loss_data)
@@ -3713,7 +3713,7 @@ class NDMPredictor:
         if attn is not None:
             self.visualizer.plot_attention_heatmap(attn)
 
-        # ISEF Enhancement: Additional visualizations
+        # Additional visualizations
         if "baselines" in validation and "correlation" in validation:
             our_auc = validation["correlation"].get("roc_auc_combined", 0.5)
             self.visualizer.plot_baseline_comparison(our_auc, validation["baselines"])
@@ -3745,7 +3745,7 @@ class NDMPredictor:
         )
         self.reporter.generate_mutation_suggestions(agg_df)
 
-        # Save full results (ISEF-enhanced)
+        # Save full results
         results_to_save = {}
         for k, v in validation.items():
             if v is not None:
@@ -3760,8 +3760,8 @@ class NDMPredictor:
         with open(self.output_dir / "validation_results.json", "w") as f:
             json.dump(results_to_save, f, indent=2, default=str)
 
-        # ISEF: Generate comprehensive summary
-        self._generate_isef_summary(agg_df, validation)
+        # Generate summary
+        self._generate_summary(agg_df, validation)
         log("All outputs generated successfully")
 
     def _generate_colored_pdb(self, agg_df: pd.DataFrame):
@@ -3789,10 +3789,10 @@ class NDMPredictor:
         except Exception as e:
             log(f"Could not generate colored PDB: {e}")
 
-    def _generate_isef_summary(self, agg_df: pd.DataFrame, validation: Dict):
-        """Generate ISEF-style research summary."""
+    def _generate_summary(self, agg_df: pd.DataFrame, validation: Dict):
+        """Generate research summary."""
         summary = []
-        summary.append("ISEF RESEARCH SUMMARY: NDM-1 Mutation Hotspot Prediction")
+        summary.append("RESEARCH SUMMARY: NDM-1 Mutation Hotspot Prediction")
 
         summary.append("\n## RESEARCH QUESTION")
         summary.append(
@@ -3856,9 +3856,9 @@ class NDMPredictor:
         summary.append("sequence-based approaches for predicting resistance mutations.")
 
         report = "\n".join(summary)
-        with open(self.output_dir / "ISEF_summary.txt", "w") as f:
+        with open(self.output_dir / "summary.txt", "w") as f:
             f.write(report)
-        log("\nISEF Summary saved to ISEF_summary.txt")
+        log("\nSummary saved to summary.txt")
 
 
 # CLI & NOTEBOOK INTERFACE
@@ -4015,8 +4015,8 @@ def main():
 # AUTO-RUN FOR NOTEBOOKS (Kaggle/Colab)
 if RUNNING_IN_NOTEBOOK and os.environ.get("SPADUPA_DISABLE_AUTORUN", "0") != "1":
     # In notebook: run automatically with default settings
-    print("🧬 Running NDM-1 Mutation Hotspot Predictor...")
-    print("   (To customize, call: run_pipeline(epochs=100, n_ensemble=5, ...))")
+    print("Running NDM-1 Mutation Hotspot Predictor...")
+    print("(To customize, call: run_pipeline(epochs=100, n_ensemble=5, ...))")
     print()
     results_df, validation = run_pipeline()
 elif __name__ == "__main__":
