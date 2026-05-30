@@ -62,15 +62,6 @@ python scripts/groupkfold_cv.py \
   --batch-size "${GKFOLD_BATCH_SIZE}" \
   --output output/groupkfold/imp
 
-python scripts/groupkfold_cv.py \
-  --input data/b1_superfamily.fasta \
-  --clusters "${CLUSTER_PREFIX}.csv" \
-  --family VIM \
-  --identity "${GKFOLD_IDENTITY}" \
-  --device cuda \
-  --batch-size "${GKFOLD_BATCH_SIZE}" \
-  --output output/groupkfold/vim
-
 # Optimized full-family run with AMP + cache + DataParallel
 python scripts/kaggle_multi_enzyme_real.py \
   --input data/b1_superfamily.fasta \
@@ -81,6 +72,30 @@ python scripts/kaggle_multi_enzyme_real.py \
   --data-parallel \
   --profile \
   --max-family-seqs "${MAX_FAMILY_SEQS}" \
+  --output "${OUTPUT_ROOT}"
+# Optional leakage-free GroupKFold sanity check for IMP.
+# This is intentionally left as a small-family diagnostic and can be skipped
+# if the family is too small after clustering.
+python scripts/groupkfold_cv.py \
+  --input data/b1_superfamily.fasta \
+  --clusters "${CLUSTER_PREFIX}.csv" \
+  --family IMP \
+  --identity "${GKFOLD_IDENTITY}" \
+  --device cuda \
+  --batch-size "${GKFOLD_BATCH_SIZE}" \
+  --output output/groupkfold/imp || true
+
+# Full-superfamily benchmark over the entire 2000-sequence filtered set.
+python scripts/kaggle_superfamily_2000.py \
+  --input data/b1_superfamily.fasta \
+  --device cuda \
+  --max-seqs "${DATASET_MAX_SEQS}" \
+  --batch-size "${EMBED_BATCH_SIZE}" \
+  --embed-cache "${EMBED_CACHE}" \
+  --amp \
+  --data-parallel \
+  --profile \
+  --clusters "${CLUSTER_PREFIX}.csv" \
   --output "${OUTPUT_ROOT}"
 
 echo "Done. Outputs:"
