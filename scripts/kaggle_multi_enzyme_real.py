@@ -86,6 +86,26 @@ def parse_args() -> argparse.Namespace:
         help="ESM-2 batch size (default: 2)",
     )
     parser.add_argument(
+        "--embed-cache",
+        default=None,
+        help="Optional path to save/load embedding cache (npz)",
+    )
+    parser.add_argument(
+        "--amp",
+        action="store_true",
+        help="Enable torch.cuda.amp for mixed precision (faster)",
+    )
+    parser.add_argument(
+        "--data-parallel",
+        action="store_true",
+        help="Wrap model with DataParallel when multiple GPUs are available",
+    )
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Print per-step timing for profiling",
+    )
+    parser.add_argument(
         "--curated-mutations",
         type=str,
         default="data/curated_mutations.json",
@@ -427,14 +447,35 @@ def main() -> int:
     if not order:
         raise RuntimeError("No NDM/VIM/IMP sequences found for analysis.")
 
+    import time
+
+    start_time = time.time()
     # Real ESM-2 model.
     print("Loading real ESM-2 model: esm2_t33_650M_UR50D")
     model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
     model = model.to(device).eval()
+
+    # Optional DataParallel if user requests and multiple GPUs exist
+    if args.data_parallel and torch.cuda.is_available() and torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
+        print(f"Wrapped model in DataParallel ({torch.cuda.device_count()} GPUs)")
+
     batch_converter = alphabet.get_batch_converter()
     print(f"ESM-2 ready on {device}")
 
     curated_map = load_curated_mutations(args.curated_mutations, args.curated_zero_indexed)
+
+    # Load embedding cache if provided
+    embedding_cache: Dict[str, np.ndarray] = {}
+    if args.embed_cache:
+        cache_path = Path(args.embed_cache)
+        if cache_path.exists():
+            try:
+                data = np.load(str(cache_path), allow_pickle=True)
+                embedding_cache = {k: data[k] for k in data.files}
+                print(f"Loaded {len(embedding_cache)} cached embeddings from {cache_path}")
+            except Exception as e:
+                print(f"Warning: failed to load embed cache: {e}")
 
     summary_rows = []
     for family in order:
@@ -443,21 +484,41 @@ def main() -> int:
         print(f"\n[{family}] reference: {reference.header}")
         print(f"[{family}] sequences: {len(records)}")
 
-        # Embed all sequences with the real model.
+        # Embed all sequences with the real model (with optional cache and AMP).
         embeddings: Dict[str, np.ndarray] = {}
         names = [r.header for r in records]
         seqs = [r.sequence for r in records]
         batch_size = max(1, args.batch_size)
-        for start in range(0, len(records), batch_size):
-            chunk = records[start : start + batch_size]
+
+        # Pre-fill from global cache if available
+        for r in records:
+            if r.header in embedding_cache:
+                embeddings[r.header] = embedding_cache[r.header]
+
+        missing_records = [r for r in records if r.header not in embeddings]
+        if missing_records:
+            print(f"Computing embeddings for {len(missing_records)} sequences (batch_size={batch_size}, amp={args.amp})")
+        t_embed_start = time.time()
+        for start in range(0, len(missing_records), batch_size):
+            chunk = missing_records[start : start + batch_size]
             batch = [(r.header, r.sequence) for r in chunk]
             _, _, toks = batch_converter(batch)
             toks = toks.to(device)
             with torch.no_grad():
-                out = model(toks, repr_layers=[33], return_contacts=False)
+                if args.amp and torch.cuda.is_available():
+                    with torch.cuda.amp.autocast():
+                        out = model(toks, repr_layers=[33], return_contacts=False)
+                else:
+                    out = model(toks, repr_layers=[33], return_contacts=False)
             for i, rec in enumerate(chunk):
                 emb = out["representations"][33][i, 1 : len(rec.sequence) + 1].detach().cpu().numpy()
                 embeddings[rec.header] = emb
+                # update global cache
+                if args.embed_cache:
+                    embedding_cache[rec.header] = emb
+        t_embed_end = time.time()
+        if args.profile:
+            print(f"Embeddings computed in {t_embed_end - t_embed_start:.1f}s for {len(missing_records)} sequences")
 
         df, scores = compute_family_scores(
             reference, records, embeddings, alpha=args.alpha, hops=args.hops, family=family
@@ -522,6 +583,14 @@ def main() -> int:
                 print(
                     f"[{family}] No curated mutations found in {args.curated_mutations}; skipping high-confidence analysis."
                 )
+
+        # Save updated embedding cache after each family to avoid losing work on long runs
+        if args.embed_cache:
+            try:
+                Path(args.embed_cache).parent.mkdir(parents=True, exist_ok=True)
+                np.savez_compressed(args.embed_cache, **embedding_cache)
+            except Exception as e:
+                print(f"Warning: failed to save embedding cache: {e}")
 
     summary = pd.DataFrame(summary_rows)
     summary.to_csv(Path(args.output) / "enzyme_auc_summary.csv", index=False)
