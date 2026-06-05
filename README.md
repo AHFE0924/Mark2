@@ -1,4 +1,4 @@
-# GNN
+
 This project predicts mutation-tolerant positions in B1 metallo-beta-lactamases using ESM-2 embeddings and graph-based propagation.
 
 ## Superfamily data expansion
