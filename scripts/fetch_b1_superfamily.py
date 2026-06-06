@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Fetch B1 MBL superfamily sequences from UniProt and cluster at 40% identity."""
+"""Fetch B1 MBL superfamily sequences from UniProt and cluster.
+
+Clustering method priority (when --method auto):
+  1. DIAMOND  -- BLOSUM-based; recommended because it accounts for
+                 conservative substitutions at easily-mutated residues,
+                 which is especially important for metallo-beta-lactamase
+                 variant analysis.  See cluster_utils.run_diamond for refs.
+  2. cd-hit   -- fast identity clustering (legacy default).
+  3. greedy   -- pure-Python pairwise fallback; no external dependencies.
+"""
 from __future__ import annotations
 
 import argparse
@@ -22,7 +31,7 @@ for path in (str(REPO_ROOT), str(SCRIPTS_DIR)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from cluster_utils import greedy_cluster, run_cdhit, write_cluster_csv
+from cluster_utils import greedy_cluster, run_clustering, write_cluster_csv
 
 
 DEFAULT_FAMILIES = ["NDM", "VIM", "IMP", "SPM", "GIM", "SIM"]
@@ -95,7 +104,7 @@ def parse_args() -> argparse.Namespace:
         "--cluster-identity",
         type=float,
         default=0.4,
-        help="CD-HIT identity threshold (default: 0.4)",
+        help="Clustering identity threshold (default: 0.4)",
     )
     parser.add_argument(
         "--cluster-output",
@@ -119,9 +128,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--method",
-        choices=["auto", "cdhit", "greedy"],
+        choices=["auto", "diamond", "cdhit", "greedy"],
         default="auto",
-        help="Clustering method (default: auto)",
+        help=(
+            "Clustering method (default: auto). "
+            "'auto' tries DIAMOND → cd-hit → greedy. "
+            "'diamond' is recommended (BLOSUM-based, handles easily-mutated residues). "
+            "'cdhit' uses CD-HIT sequence identity. "
+            "'greedy' uses pure-Python pairwise alignment."
+        ),
     )
     parser.add_argument(
         "--stats-output",
@@ -317,25 +332,21 @@ def main() -> int:
     cluster_prefix = Path(args.cluster_output)
     cluster_prefix.parent.mkdir(parents=True, exist_ok=True)
 
-    result = None
-    if args.method in {"auto", "cdhit"}:
-        try:
-            result = run_cdhit(str(output_path), str(cluster_prefix), args.cluster_identity)
-            print(f"cd-hit clustering complete: {result.cluster_count} clusters")
-        except FileNotFoundError:
-            if args.method == "cdhit":
-                raise SystemExit("cd-hit not found. Install it or use --method greedy.")
-
-    if result is None:
-        result = greedy_cluster(filtered_records, args.cluster_identity)
-        print(f"Greedy clustering complete: {result.cluster_count} clusters")
+    result = run_clustering(
+        fasta_path=str(output_path),
+        output_prefix=str(cluster_prefix),
+        identity=args.cluster_identity,
+        method=args.method,
+    )
 
     cluster_csv = cluster_prefix.with_suffix(".csv")
     write_cluster_csv(result.assignments, str(cluster_csv))
+
     stats = {
         "raw_records": len(records),
         "filtered_records": len(filtered_records),
         "removed": removed,
+        "clustering_method": result.method,
         "filters": {
             "min_length": args.min_length,
             "max_length": args.max_length,
@@ -357,7 +368,7 @@ def main() -> int:
         print(f"Saved family counts: {family_csv}")
 
     print(f"Saved clustered FASTA: {output_path}")
-    print(f"Cluster assignments: {cluster_csv}")
+    print(f"Cluster assignments ({result.method}): {cluster_csv}")
     return 0
 
 
