@@ -225,7 +225,7 @@ def get_active_site_positions(family: str, ref_seq: str) -> List[int]:
     return [min(p - 1, n - 1) for p in bbl_positions if p - 1 < n]
 
 
-(n_residues: int) -> np.ndarray:
+def build_chain_graph(n_residues: int) -> np.ndarray:
     adj = np.zeros((n_residues, n_residues), dtype=np.float32)
     for i in range(n_residues):
         start = max(0, i - 5)
